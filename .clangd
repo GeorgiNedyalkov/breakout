@@ -1,0 +1,5 @@
+CompileFlags:
+  Compiler: C:/raylib/w64devkit/bin/gcc.exe
+  Add:
+    - -IC:/raylib/raylib/src
+    - -DPLATFORM_DESKTOP
