@@ -1,4 +1,6 @@
 #include "raylib.h"
+#include <stdbool.h>
+#include <stdio.h>
 
 #define FPS 60
 #define SCREEN_WIDTH  2000
@@ -10,11 +12,14 @@
 #define BALL_WIDTH    25
 #define BALL_HEIGHT   25
 #define BALL_SPEED    1000
+#define BRICK_WIDTH   150
+#define BRICK_HEIGHT  25
 
 typedef enum game_mode {
 	MENU,
 	START,
 	PLAY,
+	COMPLETED,
 	OVER,
 } game_mode;
 
@@ -43,16 +48,22 @@ typedef struct brick {
 	int height;
 	Vector2 position;
 	Color color;
+	int lives;
+	bool is_dead;
 } brick;
 
 void process_input(float dt);
 void render_player(void);
 void render_ball(void);
 void render_menu(void);
+void render_bricks(void);
 void render_game_over(void);
+void render_game_start(void);
+void render_level_completed(int);
+void render_screen_center(void);
 void update_ball(float dt);
 void update_player(void);
-void check_collision(void);
+bool check_collision(Vector2, int, int, Vector2, int, int);
 
 game g = {
 	.mode = START
@@ -72,7 +83,7 @@ ball b = {
 	.height      = BALL_HEIGHT,
 	.direction.x = 0.5f,
 	.direction.y = 1,
-	.color       = WHITE
+	.color       = GREEN,
 };
 
 
@@ -85,15 +96,18 @@ int main(void)
 
     Sound collision_sound = LoadSound("assets/collision.mp3");
 
-	brick bricks[10];
+	int level_bricks_count = 1;
+	brick bricks[level_bricks_count];
 
 	for (int i = 0; i < sizeof(bricks) / sizeof(brick); ++i)
 	{
-		bricks[i].position.x = 1 + i * 100;
+		bricks[i].position.x = 1 + i * 200;
 		bricks[i].position.y = 100;
-		bricks[i].width      = 50;
-		bricks[i].height     = 50;
+		bricks[i].width      = BRICK_WIDTH;
+		bricks[i].height     = BRICK_HEIGHT;
 		bricks[i].color      = PURPLE;
+		bricks[i].lives      = 1;
+		bricks[i].is_dead    = false;
 	}
 
 	// Main game loop
@@ -104,16 +118,49 @@ int main(void)
 			g.mode = OVER;
 			render_game_over();
 		}
+		else if (level_bricks_count == 0)
+		{
+			g.mode = COMPLETED;
+			render_level_completed(1);
+		}
+
+
 		// Update
 		//----------------------------------------------------------------------------------
 		float dt = GetFrameTime();
 		process_input(dt);
 
+		if (g.mode == START)
+		{
+			render_game_start();
+		}
+
 		if (g.mode == START || g.mode == PLAY)
 		{
 			update_player();
 			update_ball(dt);
-			check_collision();
+
+			if (check_collision(b.position, b.width, b.height, player.position, player.width, player.height))
+			{
+				b.direction.y *= -1;
+			}
+
+			for (int i = 0; i < sizeof(bricks) / sizeof(brick); ++i)
+			{
+				if (bricks[i].is_dead) continue;
+
+				if (check_collision(b.position, b.width, b.height, bricks[i].position, bricks[i].width, bricks[i].height))
+				{
+					b.direction.y *= -1;
+					bricks[i].lives--;
+
+					if (bricks[i].lives == 0)
+					{
+						bricks[i].is_dead = true;
+						level_bricks_count--;
+					}
+				}
+			}
 		}
 
 		// Draw
@@ -125,15 +172,27 @@ int main(void)
 		{
 			render_menu();
 		}
-		else if (g.mode == START || g.mode == PLAY)
+		else if (g.mode == START)
 		{
+
+			render_player();
+			render_ball();
+			render_game_start();
+			render_screen_center();
+		}
+		else if (g.mode == PLAY)
+		{
+			// Render Bricks
 			for (int i = 0; i < sizeof(bricks) / sizeof(brick); ++i)
 			{
+				if (bricks[i].is_dead) continue;
+
 				DrawRectangle(bricks[i].position.x, bricks[i].position.y, bricks[i].width, bricks[i].height, bricks[i].color);
 			}
 
 			render_player();
 			render_ball();
+
 		}
 
 		EndDrawing();
@@ -144,7 +203,7 @@ int main(void)
     //--------------------------------------------------------------------------------------
     UnloadSound(collision_sound);
 	CloseAudioDevice();
-	CloseWindow(); // Close window and OpenGL context
+	CloseWindow();
     //--------------------------------------------------------------------------------------
 
 	return 0;
@@ -178,14 +237,12 @@ void process_input(float dt)
 	}
 }
 
-void check_collision()
+bool check_collision(Vector2 ball, int ball_width, int ball_height, Vector2 rec, int rec_width, int rec_height)
 {
-	if ((b.position.x + b.width > player.position.x && b.position.x < player.position.x + player.width) &&
-		 b.position.y + b.height >= player.position.y)
-	{
-		b.color = GREEN;
-		b.direction.y *= -1;
-	}
+	return ball.x + ball_width > rec.x   &&
+		   ball.x < rec.x + rec_width    &&
+		   ball.y + ball_height >= rec.y &&
+		   ball.y < rec.y + rec_height;
 }
 
 void update_player()
@@ -238,18 +295,54 @@ void render_menu()
 	DrawText("Pause", SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, 32, PURPLE);
 }
 
+void render_game_start()
+{
+	Font font             = GetFontDefault();
+	const char* text      = "Press SPACE to start";
+	int font_size         = 32;
+	Vector2 text_position = MeasureTextEx(font, text, font_size, 0);    // Measure string size for Font
+
+	DrawText(text, SCREEN_WIDTH / 2 - text_position.x, SCREEN_HEIGHT / 2 - text_position.y, font_size, WHITE);
+}
+
 void render_game_over()
 {
-	DrawText("GAME OVER", SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, 64, RED);
+	Font font             = GetFontDefault();
+	const char* text      = "GAME OVER";
+	int font_size         = 64;
+	Vector2 text_position = MeasureTextEx(font, text, font_size, 0);    // Measure string size for Font
+
+	DrawText(text, SCREEN_WIDTH / 2 - text_position.x, SCREEN_HEIGHT / 2 - text_position.y, font_size, RED);
 }
+
+void render_level_completed(int level_number)
+{
+	Font font             = GetFontDefault();
+	const char* text      = TextFormat("Level Completed %i", level_number);
+	int font_size         = 64;
+	Vector2 text_position = MeasureTextEx(font, text, font_size, 0);    // Measure string size for Font
+
+	DrawText(text, (SCREEN_WIDTH / 2) - text_position.x, SCREEN_HEIGHT / 2 - text_position.y, font_size, GREEN);
+}
+
+void render_screen_center()
+{
+	int start_x = 0;
+	int start_y = SCREEN_HEIGHT / 2;
+	int end_x   = SCREEN_WIDTH;
+	int end_y   = SCREEN_HEIGHT / 2;
+
+	DrawLine(start_x, start_y, end_x, end_y, PURPLE);
+}
+
 
 void render_player()
 {
-	int space = 50;
-	for (int i = 1; i <= player.lives; ++i)
-	{
-		DrawRectangle(i * space, 50, 25, 25, RED);
-	}
+	// int space = 50;
+	// for (int i = 1; i <= player.lives; ++i)
+	// {
+	// 	DrawRectangle(i * space, 50, 25, 25, RED);
+	// }
 
   	DrawRectangle(player.position.x, player.position.y, player.width, player.height, BLUE);
 }
@@ -258,3 +351,12 @@ void render_ball()
 {
   DrawRectangle(b.position.x, b.position.y, b.width, b.height, b.color);
 }
+
+// void render_bricks()
+// {
+// 	for (int i = 0; i < sizeof(bricks) / sizeof(brick); ++i)
+// 	{
+// 		DrawRectangle(bricks[i].position.x, bricks[i].position.y, bricks[i].width, bricks[i].height, bricks[i].color);
+// 	}
+// }
+//
