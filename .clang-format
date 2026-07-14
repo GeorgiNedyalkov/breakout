@@ -1,0 +1,5 @@
+BasedOnStyle: LLVM
+BreakBeforeBraces: Allman
+AlignConsecutiveAssignments: true
+AlignConsecutiveDeclarations: true
+IndentWidth: 4
