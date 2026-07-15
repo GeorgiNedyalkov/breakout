@@ -2,19 +2,15 @@
 
 Learn C by making breakout.
 
-## Levels
+## Collission and Game Feel
 
-Based on input from Claude.
+The fun thing for Breakout is the ability to control the ball if you hit it in the right place.
+Right now the ball just changes its y direction. We need to use a function that tracks the distance
+from the paddle to where it hit the ball in order to influence its direction.
 
-Level is represented as a grid of rows and columns.
-Letters are used to determine the type of brick.
-The grid can only go to the middle of the screen.
-The screen dimensions are fixed for now but later the game can be resized to full screen. Then they have to be in a certain aspect ration maybe?
+Also the collision on the side is wrong.
 
-On game start
+Brick collisions.
 
-Paddle and ball are on their starting positions.
-Bricks are initialized and loaded on the level.
-The remaining bricks are set.
-Once the remaining bricks are 0, the level is completed.
-The screen shows "Level n" is completed and "Press Space to start".
+See of the paddle collides from the side then reverse x.
+See of the paddle collides from the top then reverse  y.

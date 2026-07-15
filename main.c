@@ -1,12 +1,13 @@
 #include "raylib.h"
 #include <stdbool.h>
+#include "raymath.h"
 
 #define FPS 60
 #define SCREEN_WIDTH 2000
 #define SCREEN_HEIGHT 1000
 #define PADDLE_WIDTH 200
 #define PADDLE_HEIGHT 25
-#define PADDLE_SPEED 1500
+#define PADDLE_SPEED 1000
 #define PLAYER_LIVES 3
 #define BALL_WIDTH 25
 #define BALL_HEIGHT 25
@@ -15,7 +16,7 @@
 #define BRICK_HEIGHT 50
 #define GRID_COLS 10
 #define GRID_ROWS 5
-#define MAX_LEVELS 2
+#define MAX_LEVELS 5
 
 typedef enum game_mode
 {
@@ -62,6 +63,7 @@ typedef struct brick
 
 void process_input(float dt);
 void init_level(int level_index);
+
 void render_player(void);
 void render_ball(void);
 void render_menu(void);
@@ -70,15 +72,22 @@ void render_game_over(void);
 void render_game_start(void);
 void render_level_completed(int);
 void render_screen_center(void);
+void render_debug_info(void);
+
 void update_ball(float dt);
 void update_player(void);
 bool check_collision(Vector2, int, int, Vector2, int, int);
+float calculate_distance_from_centers(void);
+void bounce_off_paddle();
+
 void reset_positions(void);
+void reset_ball_position(void);
 void kill_bricks(void);
 
 //
 // Init Global Variables
 //
+
 game g = {.mode = START, .level_index = 0};
 
 paddle player = {
@@ -102,8 +111,8 @@ int level_bricks_count;
 brick bricks[GRID_ROWS * GRID_COLS];
 
 char levels[MAX_LEVELS][GRID_ROWS][GRID_COLS] = {
-    {"bbbbbbbbbb", "..........", "..........", "..........", ".........."},
-    {"vvvvvvvvvv", "..........", "..........", "..........", ".........."}};
+    {"..........", "..........", "..........", "..........", ".........."},
+};
 
 int main(void)
 {
@@ -143,12 +152,10 @@ int main(void)
             update_player();
             update_ball(dt);
 
-            if (check_collision(b.position, b.width, b.height, player.position,
-                                player.width, player.height))
+            if (check_collision(b.position, b.width, b.height, player.position, player.width,
+                                player.height))
             {
-                // NOTE: Calculate ball direction depending on where it hit the
-                // paddle
-                b.direction.y *= -1;
+				bounce_off_paddle();
             }
 
             for (int i = 0; i < sizeof(bricks) / sizeof(brick); ++i)
@@ -158,9 +165,8 @@ int main(void)
 
                 // NOTE: Calculate ball direction depending on where it hit the
                 // brick Also there is a big if you hit the brick on the side
-                if (check_collision(b.position, b.width, b.height,
-                                    bricks[i].position, bricks[i].width,
-                                    bricks[i].height))
+                if (check_collision(b.position, b.width, b.height, bricks[i].position,
+                                    bricks[i].width, bricks[i].height))
                 {
                     b.direction.y *= -1;
                     bricks[i].lives--;
@@ -177,8 +183,8 @@ int main(void)
         //----------------------------------------------------------------------------------
         BeginDrawing();
         ClearBackground(BLACK);
-        DrawText(TextFormat("Bricks in level: %i", level_bricks_count), 100,
-                 SCREEN_HEIGHT - 200, 30, GREEN);
+
+        render_debug_info();
 
         //
         // Render Bricks Grid
@@ -255,43 +261,53 @@ void process_input(float dt)
 
 void init_level(int level_index)
 {
-	// Bounds Check for Level Indexes
-	if (level_index > MAX_LEVELS) return;
+    // Bounds Check for Level Indexes
+    if (level_index > MAX_LEVELS)
+        return;
 
     char (*current_level)[GRID_COLS] = levels[level_index];
 
     level_bricks_count = 0;
-    // Initialize the Bricks with the current level string
+
     for (int row = 0; row < GRID_ROWS; ++row)
     {
         for (int col = 0; col < GRID_COLS; ++col)
         {
             if (current_level[row][col] == '.')
+            {
                 continue;
-
-            int padding = 50;
-            int gap     = 5;
-
-            brick new_brick;
-            new_brick.width      = BRICK_WIDTH;
-            new_brick.height     = BRICK_HEIGHT;
-            new_brick.position.x = col * (BRICK_WIDTH + gap) + padding;
-            new_brick.position.y = row * (BRICK_HEIGHT + gap) + padding;
-            new_brick.is_dead    = false;
-
-            if (current_level[row][col] == 'b')
-            {
-                new_brick.lives = 1;
-                new_brick.color = BLUE;
             }
-            else if (current_level[row][col] == 'v')
+            else
             {
-                new_brick.lives = 2;
-                new_brick.color = VIOLET;
-            }
+                int padding = 50;
+                int gap     = 5;
 
-            bricks[level_bricks_count] = new_brick;
-            level_bricks_count++;
+                brick new_brick;
+                new_brick.width      = BRICK_WIDTH;
+                new_brick.height     = BRICK_HEIGHT;
+                new_brick.position.x = col * (BRICK_WIDTH + gap) + padding;
+                new_brick.position.y = row * (BRICK_HEIGHT + gap) + padding;
+                new_brick.is_dead    = false;
+
+                if (current_level[row][col] == 'b')
+                {
+                    new_brick.lives = 1;
+                    new_brick.color = BLUE;
+                }
+                else if (current_level[row][col] == 'v')
+                {
+                    new_brick.lives = 2;
+                    new_brick.color = VIOLET;
+                }
+                else
+                {
+                    new_brick.lives = 2;
+                    new_brick.color = RED;
+                }
+
+                bricks[level_bricks_count] = new_brick;
+                level_bricks_count++;
+            }
         }
     }
 
@@ -315,13 +331,37 @@ void update_player()
     }
 }
 
+void bounce_off_paddle()
+{
+    float distance = calculate_distance_from_centers();
+
+	Vector2 new_direction;
+	new_direction.y = b.direction.y * -1;
+	new_direction.x = distance;
+	new_direction = Vector2Normalize(new_direction);
+
+    b.direction = new_direction;
+}
+
 void update_ball(float dt)
 {
     if (g.mode == START)
     {
-        b.position.x =
-            player.position.x + ((float)player.width / 2) - (float)b.width / 2;
-        b.position.y = player.position.y - player.height;
+        b.position.x  = (float)SCREEN_WIDTH / 2 - (float)b.width / 2;
+        b.position.y  = (float)SCREEN_HEIGHT / 2 - (float)b.height / 2;
+
+        // b.position.x =
+        //     player.position.x + ((float)player.width / 2) - (float)b.width /
+        //     2;
+        // b.position.y = player.position.y - player.height;
+
+        b.direction.x = 0;
+        b.direction.y = 1;
+
+        // b.position.x =
+        //     player.position.x + ((float)player.width / 2) - (float)b.width /
+        //     2;
+        // b.position.y = player.position.y - player.height;
     }
     else
     {
@@ -340,7 +380,7 @@ void update_ball(float dt)
         if (b.position.y >= SCREEN_HEIGHT + 10)
         {
             player.lives--;
-            reset_positions();
+			reset_ball_position();
             g.mode = START;
         }
         else if (b.position.y <= 0)
@@ -350,10 +390,16 @@ void update_ball(float dt)
     }
 }
 
+void reset_ball_position()
+{
+    b.position.x  = player.position.x + ((float)player.width / 2) - (float)b.width / 2;
+    b.position.y  = player.position.y - player.height;
+    b.direction.y = -1;
+}
+
 void reset_positions()
 {
-    b.position.x =
-        player.position.x + ((float)player.width / 2) - (float)b.width / 2;
+    b.position.x  = player.position.x + ((float)player.width / 2) - (float)b.width / 2;
     b.position.y  = player.position.y - player.height;
     b.direction.y = -1;
 
@@ -361,19 +407,15 @@ void reset_positions()
     player.position.y = SCREEN_HEIGHT - PADDLE_HEIGHT;
 }
 
-bool check_collision(Vector2 ball, int ball_width, int ball_height, Vector2 rec,
-                     int rec_width, int rec_height)
+bool check_collision(Vector2 ball, int ball_width, int ball_height, Vector2 rec, int rec_width,
+                     int rec_height)
 {
     return ball.x + ball_width > rec.x && ball.x < rec.x + rec_width &&
            ball.y + ball_height > rec.y && ball.y < rec.y + rec_height;
 }
 
 // Render Functions
-
-void render_menu()
-{
-    DrawText("Pause", SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, 32, PURPLE);
-}
+void render_menu() { DrawText("Pause", SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, 32, PURPLE); }
 
 void render_game_start()
 {
@@ -383,12 +425,10 @@ void render_game_start()
     Font        font            = GetFontDefault();
     Vector2     text_dimensions = MeasureTextEx(font, text, font_size, 0);
 
-    DrawText(TextFormat("Text dimensions: x = %i y = %i", text_dimensions.x,
-                        text_dimensions.y),
+    DrawText(TextFormat("Text dimensions: x = %i y = %i", text_dimensions.x, text_dimensions.y),
              200, 200, 16, BLUE);
 
-    DrawText(text, SCREEN_WIDTH / 2 - text_width / 2, SCREEN_HEIGHT / 2,
-             font_size, WHITE);
+    DrawText(text, SCREEN_WIDTH / 2 - text_width / 2, SCREEN_HEIGHT / 2, font_size, WHITE);
 }
 
 void render_game_over()
@@ -418,14 +458,10 @@ void render_screen_center()
 
 void render_player()
 {
-    DrawRectangle(player.position.x, player.position.y, player.width,
-                  player.height, BLUE);
+    DrawRectangle(player.position.x, player.position.y, player.width, player.height, BLUE);
 }
 
-void render_ball()
-{
-    DrawRectangle(b.position.x, b.position.y, b.width, b.height, b.color);
-}
+void render_ball() { DrawRectangle(b.position.x, b.position.y, b.width, b.height, b.color); }
 
 void render_bricks()
 {
@@ -434,8 +470,8 @@ void render_bricks()
         if (bricks[i].is_dead)
             continue;
 
-        DrawRectangle(bricks[i].position.x, bricks[i].position.y,
-                      bricks[i].width, bricks[i].height, bricks[i].color);
+        DrawRectangle(bricks[i].position.x, bricks[i].position.y, bricks[i].width, bricks[i].height,
+                      bricks[i].color);
     }
 }
 
@@ -448,4 +484,24 @@ void kill_bricks()
     }
 
     level_bricks_count = 0;
+}
+
+float calculate_distance_from_centers()
+{
+	Vector2 p1 = player.position;
+	p1.x += (float)player.width / 2;
+
+	Vector2 b1 = b.position;
+	b1.x += (float)b.width / 2;
+
+	float distance = b1.x - p1.x;
+	distance = distance / 100;
+
+	distance = Clamp(distance, -1.0, 1.0);
+
+	return distance;
+}
+
+void render_debug_info()
+{
 }
