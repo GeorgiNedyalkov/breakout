@@ -67,24 +67,29 @@ void init_level(int level_index);
 
 void render_player(void);
 void render_ball(void);
-void render_menu(void);
 void render_bricks(void);
-void render_game_over(void);
-void render_game_start(void);
+void render_at_center(const char *, float, Color);
+
+void render_menu(void);
 void render_level_completed(int);
-void render_screen_center(void);
-void render_debug_info(void);
-void render_game_completed(void);
 
 void  update_ball(float dt);
 void  update_player(void);
 bool  check_collision(Vector2, int, int, Vector2, int, int);
 float calculate_distance_from_centers(void);
 void  bounce_off_paddle();
+void  reset_positions(void);
+void  reset_ball_position(void);
 
-void reset_positions(void);
-void reset_ball_position(void);
+//
+// DEBUG
+//
+
+void render_screen_center(void);
+void render_debug_info(void);
 void kill_brick();
+
+Vector2 get_text_center(const char *, float);
 
 //
 // Init Global Variables
@@ -194,10 +199,6 @@ int main(void)
         // Draw
         //----------------------------------------------------------------------------------
         BeginDrawing();
-        //
-        // Update Functions
-        //
-
         ClearBackground(BLACK);
 
         render_debug_info();
@@ -208,12 +209,13 @@ int main(void)
         switch (g.mode)
         {
         case MENU:
-            render_menu();
+            render_at_center("PAUSE", 64.0f, PURPLE);
             break;
         case OVER:
-            render_game_over();
+            render_at_center("Press SPACE to start", 64.0f, GREEN);
             break;
         case START:
+ 			render_at_center("Press SPACE to start", 64.0f, GREEN);
             render_player();
             render_ball();
             render_bricks();
@@ -230,7 +232,7 @@ int main(void)
             g.mode = START;
             break;
         case FINISH:
-            render_game_completed();
+			render_at_center("GAME COMPLETED. \nThank you for playing.", 64.0f, RED);
             break;
         default:
             break;
@@ -439,50 +441,38 @@ bool check_collision(Vector2 ball, int ball_width, int ball_height, Vector2 rec,
            ball.y < rec.y + rec_height;
 }
 
+
+Vector2 get_text_center(const char *text, float font_size)
+{
+	Vector2 text_dimensions = MeasureTextEx(GetFontDefault(), text, font_size, 1.0f);
+    Vector2 text_position;
+    text_position.x = ((float)SCREEN_WIDTH / 2) - (text_dimensions.x / 2);
+    text_position.y = ((float)SCREEN_HEIGHT / 2) - (text_dimensions.y / 2);
+	return text_position;
+}
+
+
+void render_at_center(const char *text, float font_size, Color color)
+{
+    Vector2 text_position = get_text_center(text, font_size);
+    DrawText(text, text_position.x, text_position.y, font_size, color);
+}
+
 // Render Functions
-void render_menu() { DrawText("Pause", SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, 32, PURPLE); }
-
-void render_game_start()
-{
-    const char *text            = "Press SPACE to start";
-    int         font_size       = 64;
-    int         text_width      = MeasureText(text, font_size);
-    Font        font            = GetFontDefault();
-    Vector2     text_dimensions = MeasureTextEx(font, text, font_size, 0);
-
-    DrawText(TextFormat("Text dimensions: x = %i y = %i", text_dimensions.x, text_dimensions.y), 200, 200, 16, BLUE);
-
-    DrawText(text, SCREEN_WIDTH / 2 - text_width / 2, SCREEN_HEIGHT / 2, font_size, WHITE);
-}
-
-void render_game_over()
-{
-    const char *text            = "GAME OVER";
-    int         font_size       = 64;
-    int         text_width      = MeasureText(text, font_size);
-    Font        font            = GetFontDefault();
-    Vector2     text_dimensions = MeasureTextEx(font, text, font_size, 0);
-
-    DrawText(text, SCREEN_WIDTH / 2 - text_width, 100, font_size, RED);
-}
-
-void render_game_completed()
-{
-    const char *text            = "GAME COMPLETED. \nThank you for playing.";
-    int         font_size       = 64;
-    int         text_width      = MeasureText(text, font_size);
-    Font        font            = GetFontDefault();
-    Vector2     text_dimensions = MeasureTextEx(font, text, font_size, 0);
-
-    DrawText(text, SCREEN_WIDTH / 2 - text_width, 100, font_size, RED);
-}
+// NOTE: Menu will include replaying episodes later
+void render_menu() { render_at_center("PAUSE", 64.0f, PURPLE); }
 
 void render_level_completed(int level_number)
 {
-    const char *text       = TextFormat("Level Completed %i", level_number);
-    int         font_size  = 64;
-    int         text_width = MeasureText(text, font_size);
-    DrawText(text, text_width / 2, SCREEN_HEIGHT / 2, font_size, GREEN);
+    const char *text = TextFormat("Level Completed %i", level_number);
+    render_at_center(text, 64.0f, GREEN);
+}
+
+void render_debug_info()
+{
+    float       font_size     = 32.0f;
+    const char *text          = TextFormat("Level Bricks Count = %i", level_bricks_count);
+    DrawText(text, 100.0f, SCREEN_HEIGHT - 100.0f, font_size, GREEN);
 }
 
 void render_screen_center()
@@ -495,28 +485,6 @@ void render_player() { DrawRectangle(player.position.x, player.position.y, playe
 
 void render_ball() { DrawRectangle(b.position.x, b.position.y, b.width, b.height, b.color); }
 
-// void CheckCollisionPointRec(Vector2 point, Rectangle rec)
-
-void kill_brick()
-{
-    Vector2 mouse_position = GetMousePosition();
-
-    Rectangle rec;
-    rec.width  = BRICK_WIDTH;
-    rec.height = BRICK_HEIGHT;
-
-    for (int i = 0; i < sizeof(bricks) / sizeof(bricks[0]); ++i)
-    {
-        rec.x = bricks[i].position.x;
-        rec.y = bricks[i].position.y;
-        if (CheckCollisionPointRec(mouse_position, rec) && !bricks[i].is_dead)
-        {
-            bricks[i].is_dead = true;
-            level_bricks_count--;
-        }
-    }
-}
-
 void render_bricks()
 {
     for (int i = 0; i < sizeof(bricks) / sizeof(brick); ++i)
@@ -528,20 +496,21 @@ void render_bricks()
     }
 }
 
-void render_debug_info()
+void kill_brick()
 {
-    float font_size = 32.0f;
-    float spacing   = 1.0f;
+    Rectangle rec;
+    rec.width  = BRICK_WIDTH;
+    rec.height = BRICK_HEIGHT;
 
-    const char *text = TextFormat("Level Bricks Count = %i", level_bricks_count);
-
-    // Text dimensions returns the width - x and the height - y of the text (The height is the font
-    // size)
-    Vector2 text_dimensions = MeasureTextEx(GetFontDefault(), text, font_size, spacing);
-
-    Vector2 text_position;
-    text_position.x = ((float)SCREEN_WIDTH / 2) - (text_dimensions.x / 2);
-    text_position.y = ((float)SCREEN_HEIGHT / 2) - (text_dimensions.y / 2);
-
-    DrawText(text, text_position.x, text_position.y, font_size, GREEN);
+    Vector2 mouse_position = GetMousePosition();
+    for (int i = 0; i < sizeof(bricks) / sizeof(bricks[0]); ++i)
+    {
+        rec.x = bricks[i].position.x;
+        rec.y = bricks[i].position.y;
+        if (CheckCollisionPointRec(mouse_position, rec) && !bricks[i].is_dead)
+        {
+            bricks[i].is_dead = true;
+            level_bricks_count--;
+        }
+    }
 }
