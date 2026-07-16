@@ -1,6 +1,6 @@
 #include "raylib.h"
-#include <stdbool.h>
 #include "raymath.h"
+#include <stdbool.h>
 
 #define FPS 60
 #define SCREEN_WIDTH 2000
@@ -16,7 +16,7 @@
 #define BRICK_HEIGHT 50
 #define GRID_COLS 10
 #define GRID_ROWS 5
-#define MAX_LEVELS 5
+#define MAX_LEVELS 2
 
 typedef enum game_mode
 {
@@ -25,6 +25,7 @@ typedef enum game_mode
     PLAY,
     COMPLETED,
     OVER,
+    FINISH,
 } game_mode;
 
 typedef struct game
@@ -73,16 +74,17 @@ void render_game_start(void);
 void render_level_completed(int);
 void render_screen_center(void);
 void render_debug_info(void);
+void render_game_completed(void);
 
-void update_ball(float dt);
-void update_player(void);
-bool check_collision(Vector2, int, int, Vector2, int, int);
+void  update_ball(float dt);
+void  update_player(void);
+bool  check_collision(Vector2, int, int, Vector2, int, int);
 float calculate_distance_from_centers(void);
-void bounce_off_paddle();
+void  bounce_off_paddle();
 
 void reset_positions(void);
 void reset_ball_position(void);
-void kill_bricks(void);
+void kill_brick();
 
 //
 // Init Global Variables
@@ -111,7 +113,8 @@ int level_bricks_count;
 brick bricks[GRID_ROWS * GRID_COLS];
 
 char levels[MAX_LEVELS][GRID_ROWS][GRID_COLS] = {
-    {"..........", "..........", "..........", "..........", ".........."},
+    {"rrrrrrrrrr", "..........", "..........", "..........", ".........."},
+    {"r.r.r.r.r.", ".v.v.v.v.v", "g.g.g.g.g.", "b.b.b.b.b.", ".p.p.p.p.p"},
 };
 
 int main(void)
@@ -137,6 +140,11 @@ int main(void)
             g.mode = OVER;
         }
 
+        if (g.level_index == MAX_LEVELS - 1)
+        {
+            g.mode = FINISH;
+        }
+
         if (level_bricks_count == 0)
         {
             g.mode = COMPLETED;
@@ -147,15 +155,15 @@ int main(void)
             update_player();
             update_ball(dt);
         }
-        else if (g.mode == PLAY)
+
+        if (g.mode == PLAY)
         {
             update_player();
             update_ball(dt);
 
-            if (check_collision(b.position, b.width, b.height, player.position, player.width,
-                                player.height))
+            if (check_collision(b.position, b.width, b.height, player.position, player.width, player.height))
             {
-				bounce_off_paddle();
+                bounce_off_paddle();
             }
 
             for (int i = 0; i < sizeof(bricks) / sizeof(brick); ++i)
@@ -165,8 +173,8 @@ int main(void)
 
                 // NOTE: Calculate ball direction depending on where it hit the
                 // brick Also there is a big if you hit the brick on the side
-                if (check_collision(b.position, b.width, b.height, bricks[i].position,
-                                    bricks[i].width, bricks[i].height))
+                if (check_collision(b.position, b.width, b.height, bricks[i].position, bricks[i].width,
+                                    bricks[i].height))
                 {
                     b.direction.y *= -1;
                     bricks[i].lives--;
@@ -175,6 +183,10 @@ int main(void)
                         bricks[i].is_dead = true;
                         level_bricks_count--;
                     }
+                    else
+                    {
+                        bricks[i].color = ColorAlpha(bricks[i].color, 0.5f);
+                    }
                 }
             }
         }
@@ -182,6 +194,10 @@ int main(void)
         // Draw
         //----------------------------------------------------------------------------------
         BeginDrawing();
+        //
+        // Update Functions
+        //
+
         ClearBackground(BLACK);
 
         render_debug_info();
@@ -200,6 +216,7 @@ int main(void)
         case START:
             render_player();
             render_ball();
+            render_bricks();
             break;
         case PLAY:
             render_player();
@@ -210,6 +227,11 @@ int main(void)
             g.level_index++;
             render_level_completed(g.level_index);
             init_level(g.level_index);
+            g.mode = START;
+            break;
+        case FINISH:
+            render_game_completed();
+            break;
         default:
             break;
         }
@@ -253,22 +275,24 @@ void process_input(float dt)
             g.mode = MENU;
         }
     }
-    else if (IsKeyPressed(KEY_K))
+
+    if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT))
     {
-        kill_bricks();
+        kill_brick();
     }
 }
 
 void init_level(int level_index)
 {
     // Bounds Check for Level Indexes
-    if (level_index > MAX_LEVELS)
+    if (level_index == MAX_LEVELS - 1)
+    {
         return;
+    }
 
     char (*current_level)[GRID_COLS] = levels[level_index];
 
     level_bricks_count = 0;
-
     for (int row = 0; row < GRID_ROWS; ++row)
     {
         for (int col = 0; col < GRID_COLS; ++col)
@@ -288,21 +312,25 @@ void init_level(int level_index)
                 new_brick.position.x = col * (BRICK_WIDTH + gap) + padding;
                 new_brick.position.y = row * (BRICK_HEIGHT + gap) + padding;
                 new_brick.is_dead    = false;
+                new_brick.lives      = 1;
 
-                if (current_level[row][col] == 'b')
+                switch (current_level[row][col])
                 {
-                    new_brick.lives = 1;
-                    new_brick.color = BLUE;
-                }
-                else if (current_level[row][col] == 'v')
-                {
-                    new_brick.lives = 2;
-                    new_brick.color = VIOLET;
-                }
-                else
-                {
-                    new_brick.lives = 2;
+                case 'r':
                     new_brick.color = RED;
+                    break;
+                case 'g':
+                    new_brick.color = GREEN;
+                    break;
+                case 'b':
+                    new_brick.color = BLUE;
+                    break;
+                case 'v':
+                    new_brick.color = VIOLET;
+                    break;
+                case 'p':
+                    new_brick.color = PINK;
+                    break;
                 }
 
                 bricks[level_bricks_count] = new_brick;
@@ -314,10 +342,6 @@ void init_level(int level_index)
     reset_positions();
     g.mode = START;
 }
-
-//
-// Update Functions
-//
 
 void update_player()
 {
@@ -331,14 +355,30 @@ void update_player()
     }
 }
 
+float calculate_distance_from_centers()
+{
+    Vector2 p1 = player.position;
+    p1.x += (float)player.width / 2;
+
+    Vector2 b1 = b.position;
+    b1.x += (float)b.width / 2;
+
+    float distance = b1.x - p1.x;
+    distance       = distance / 100;
+
+    distance = Clamp(distance, -1.0, 1.0);
+
+    return distance;
+}
+
 void bounce_off_paddle()
 {
     float distance = calculate_distance_from_centers();
 
-	Vector2 new_direction;
-	new_direction.y = b.direction.y * -1;
-	new_direction.x = distance;
-	new_direction = Vector2Normalize(new_direction);
+    Vector2 new_direction;
+    new_direction.y = b.direction.y * -1;
+    new_direction.x = distance;
+    new_direction   = Vector2Normalize(new_direction);
 
     b.direction = new_direction;
 }
@@ -347,21 +387,7 @@ void update_ball(float dt)
 {
     if (g.mode == START)
     {
-        b.position.x  = (float)SCREEN_WIDTH / 2 - (float)b.width / 2;
-        b.position.y  = (float)SCREEN_HEIGHT / 2 - (float)b.height / 2;
-
-        // b.position.x =
-        //     player.position.x + ((float)player.width / 2) - (float)b.width /
-        //     2;
-        // b.position.y = player.position.y - player.height;
-
-        b.direction.x = 0;
-        b.direction.y = 1;
-
-        // b.position.x =
-        //     player.position.x + ((float)player.width / 2) - (float)b.width /
-        //     2;
-        // b.position.y = player.position.y - player.height;
+        reset_ball_position();
     }
     else
     {
@@ -380,7 +406,7 @@ void update_ball(float dt)
         if (b.position.y >= SCREEN_HEIGHT + 10)
         {
             player.lives--;
-			reset_ball_position();
+            reset_ball_position();
             g.mode = START;
         }
         else if (b.position.y <= 0)
@@ -407,11 +433,10 @@ void reset_positions()
     player.position.y = SCREEN_HEIGHT - PADDLE_HEIGHT;
 }
 
-bool check_collision(Vector2 ball, int ball_width, int ball_height, Vector2 rec, int rec_width,
-                     int rec_height)
+bool check_collision(Vector2 ball, int ball_width, int ball_height, Vector2 rec, int rec_width, int rec_height)
 {
-    return ball.x + ball_width > rec.x && ball.x < rec.x + rec_width &&
-           ball.y + ball_height > rec.y && ball.y < rec.y + rec_height;
+    return ball.x + ball_width > rec.x && ball.x < rec.x + rec_width && ball.y + ball_height > rec.y &&
+           ball.y < rec.y + rec_height;
 }
 
 // Render Functions
@@ -425,8 +450,7 @@ void render_game_start()
     Font        font            = GetFontDefault();
     Vector2     text_dimensions = MeasureTextEx(font, text, font_size, 0);
 
-    DrawText(TextFormat("Text dimensions: x = %i y = %i", text_dimensions.x, text_dimensions.y),
-             200, 200, 16, BLUE);
+    DrawText(TextFormat("Text dimensions: x = %i y = %i", text_dimensions.x, text_dimensions.y), 200, 200, 16, BLUE);
 
     DrawText(text, SCREEN_WIDTH / 2 - text_width / 2, SCREEN_HEIGHT / 2, font_size, WHITE);
 }
@@ -434,6 +458,17 @@ void render_game_start()
 void render_game_over()
 {
     const char *text            = "GAME OVER";
+    int         font_size       = 64;
+    int         text_width      = MeasureText(text, font_size);
+    Font        font            = GetFontDefault();
+    Vector2     text_dimensions = MeasureTextEx(font, text, font_size, 0);
+
+    DrawText(text, SCREEN_WIDTH / 2 - text_width, 100, font_size, RED);
+}
+
+void render_game_completed()
+{
+    const char *text            = "GAME COMPLETED. \nThank you for playing.";
     int         font_size       = 64;
     int         text_width      = MeasureText(text, font_size);
     Font        font            = GetFontDefault();
@@ -456,12 +491,31 @@ void render_screen_center()
     DrawLine(SCREEN_WIDTH / 2, 0, SCREEN_WIDTH / 2, SCREEN_HEIGHT, PURPLE);
 }
 
-void render_player()
-{
-    DrawRectangle(player.position.x, player.position.y, player.width, player.height, BLUE);
-}
+void render_player() { DrawRectangle(player.position.x, player.position.y, player.width, player.height, BLUE); }
 
 void render_ball() { DrawRectangle(b.position.x, b.position.y, b.width, b.height, b.color); }
+
+// void CheckCollisionPointRec(Vector2 point, Rectangle rec)
+
+void kill_brick()
+{
+    Vector2 mouse_position = GetMousePosition();
+
+    Rectangle rec;
+    rec.width  = BRICK_WIDTH;
+    rec.height = BRICK_HEIGHT;
+
+    for (int i = 0; i < sizeof(bricks) / sizeof(bricks[0]); ++i)
+    {
+        rec.x = bricks[i].position.x;
+        rec.y = bricks[i].position.y;
+        if (CheckCollisionPointRec(mouse_position, rec) && !bricks[i].is_dead)
+        {
+            bricks[i].is_dead = true;
+            level_bricks_count--;
+        }
+    }
+}
 
 void render_bricks()
 {
@@ -470,38 +524,24 @@ void render_bricks()
         if (bricks[i].is_dead)
             continue;
 
-        DrawRectangle(bricks[i].position.x, bricks[i].position.y, bricks[i].width, bricks[i].height,
-                      bricks[i].color);
+        DrawRectangle(bricks[i].position.x, bricks[i].position.y, bricks[i].width, bricks[i].height, bricks[i].color);
     }
-}
-
-// Helpers
-void kill_bricks()
-{
-    for (int i = 0; i < sizeof(bricks) / sizeof(brick); ++i)
-    {
-        bricks[i].is_dead = true;
-    }
-
-    level_bricks_count = 0;
-}
-
-float calculate_distance_from_centers()
-{
-	Vector2 p1 = player.position;
-	p1.x += (float)player.width / 2;
-
-	Vector2 b1 = b.position;
-	b1.x += (float)b.width / 2;
-
-	float distance = b1.x - p1.x;
-	distance = distance / 100;
-
-	distance = Clamp(distance, -1.0, 1.0);
-
-	return distance;
 }
 
 void render_debug_info()
 {
+    float font_size = 32.0f;
+    float spacing   = 1.0f;
+
+    const char *text = TextFormat("Level Bricks Count = %i", level_bricks_count);
+
+    // Text dimensions returns the width - x and the height - y of the text (The height is the font
+    // size)
+    Vector2 text_dimensions = MeasureTextEx(GetFontDefault(), text, font_size, spacing);
+
+    Vector2 text_position;
+    text_position.x = ((float)SCREEN_WIDTH / 2) - (text_dimensions.x / 2);
+    text_position.y = ((float)SCREEN_HEIGHT / 2) - (text_dimensions.y / 2);
+
+    DrawText(text, text_position.x, text_position.y, font_size, GREEN);
 }
