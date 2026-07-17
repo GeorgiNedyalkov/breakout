@@ -113,14 +113,16 @@ ball b = {
     .color       = GREEN,
 };
 
-int level_bricks_count;
-
 brick bricks[GRID_ROWS * GRID_COLS];
+
+int level_bricks_count;
 
 char levels[MAX_LEVELS][GRID_ROWS][GRID_COLS] = {
     {"rrrrrrrrrr", "..........", "..........", "..........", ".........."},
     {"r.r.r.r.r.", ".v.v.v.v.v", "g.g.g.g.g.", "b.b.b.b.b.", ".p.p.p.p.p"},
 };
+
+// What does the game do? Keeps its state and levels.
 
 int main(void)
 {
@@ -130,6 +132,11 @@ int main(void)
 
     Sound collision_sound = LoadSound("assets/collision.mp3");
 
+    // Initialize the first level
+    //
+    // Level index
+    // Levels
+    // Level bricks count
     init_level(g.level_index);
 
     // Main game loop
@@ -140,12 +147,7 @@ int main(void)
         float dt = GetFrameTime();
         process_input(dt);
 
-        if (player.lives == 0)
-        {
-            g.mode = OVER;
-        }
-
-        if (g.level_index == MAX_LEVELS - 1)
+        if (g.level_index == MAX_LEVELS)
         {
             g.mode = FINISH;
         }
@@ -160,8 +162,7 @@ int main(void)
             update_player();
             update_ball(dt);
         }
-
-        if (g.mode == PLAY)
+        else if (g.mode == PLAY)
         {
             update_player();
             update_ball(dt);
@@ -196,6 +197,12 @@ int main(void)
             }
         }
 
+        // Only in the end check if the player was dead
+        if (player.lives <= 0)
+        {
+            g.mode = OVER;
+        }
+
         // Draw
         //----------------------------------------------------------------------------------
         BeginDrawing();
@@ -212,10 +219,10 @@ int main(void)
             render_at_center("PAUSE", 64.0f, PURPLE);
             break;
         case OVER:
-            render_at_center("Press SPACE to start", 64.0f, GREEN);
+            render_at_center("GAME OVER", 64.0f, RED);
             break;
         case START:
- 			render_at_center("Press SPACE to start", 64.0f, GREEN);
+            render_at_center("Press SPACE to start", 64.0f, GREEN);
             render_player();
             render_ball();
             render_bricks();
@@ -232,7 +239,7 @@ int main(void)
             g.mode = START;
             break;
         case FINISH:
-			render_at_center("GAME COMPLETED. \nThank you for playing.", 64.0f, RED);
+            render_at_center("GAME COMPLETED. \nThank you for playing.", 64.0f, RED);
             break;
         default:
             break;
@@ -286,15 +293,10 @@ void process_input(float dt)
 
 void init_level(int level_index)
 {
-    // Bounds Check for Level Indexes
-    if (level_index == MAX_LEVELS - 1)
-    {
-        return;
-    }
+    level_bricks_count = 0;
 
     char (*current_level)[GRID_COLS] = levels[level_index];
 
-    level_bricks_count = 0;
     for (int row = 0; row < GRID_ROWS; ++row)
     {
         for (int col = 0; col < GRID_COLS; ++col)
@@ -303,7 +305,7 @@ void init_level(int level_index)
             {
                 continue;
             }
-            else
+            else if (current_level[row][col] != '\0')
             {
                 int padding = 50;
                 int gap     = 5;
@@ -418,6 +420,8 @@ void update_ball(float dt)
     }
 }
 
+void update_bricks() {}
+
 void reset_ball_position()
 {
     b.position.x  = player.position.x + ((float)player.width / 2) - (float)b.width / 2;
@@ -441,16 +445,14 @@ bool check_collision(Vector2 ball, int ball_width, int ball_height, Vector2 rec,
            ball.y < rec.y + rec_height;
 }
 
-
 Vector2 get_text_center(const char *text, float font_size)
 {
-	Vector2 text_dimensions = MeasureTextEx(GetFontDefault(), text, font_size, 1.0f);
+    Vector2 text_dimensions = MeasureTextEx(GetFontDefault(), text, font_size, 1.0f);
     Vector2 text_position;
     text_position.x = ((float)SCREEN_WIDTH / 2) - (text_dimensions.x / 2);
     text_position.y = ((float)SCREEN_HEIGHT / 2) - (text_dimensions.y / 2);
-	return text_position;
+    return text_position;
 }
-
 
 void render_at_center(const char *text, float font_size, Color color)
 {
@@ -470,8 +472,8 @@ void render_level_completed(int level_number)
 
 void render_debug_info()
 {
-    float       font_size     = 32.0f;
-    const char *text          = TextFormat("Level Bricks Count = %i", level_bricks_count);
+    float       font_size = 32.0f;
+    const char *text      = TextFormat("Level Bricks Count = %i", level_bricks_count);
     DrawText(text, 100.0f, SCREEN_HEIGHT - 100.0f, font_size, GREEN);
 }
 
