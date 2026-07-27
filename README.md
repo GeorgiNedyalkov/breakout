@@ -5,7 +5,7 @@ Learn C by making breakout.
 
 ## Bugs:
 
-- [] Center the text
+- [x] Center the text
 - [] Fix side collision
 - [] Empty/undefined levels create garbage-colored bricks
 - [] `level_index` bounds check is off-by-one

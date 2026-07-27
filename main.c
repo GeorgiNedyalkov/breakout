@@ -7,11 +7,11 @@
 #define SCREEN_HEIGHT 1000
 #define PADDLE_WIDTH 200
 #define PADDLE_HEIGHT 25
-#define PADDLE_SPEED 1000
+#define PADDLE_SPEED 500
 #define PLAYER_LIVES 3
 #define BALL_WIDTH 25
 #define BALL_HEIGHT 25
-#define BALL_SPEED 1000
+#define BALL_SPEED 500
 #define BRICK_WIDTH 150
 #define BRICK_HEIGHT 50
 #define GRID_COLS 10
@@ -50,6 +50,7 @@ typedef struct ball
     Vector2 position;
     Vector2 direction;
     Color   color;
+    bool    out_of_bounds;
 } ball;
 
 typedef struct brick
@@ -62,8 +63,8 @@ typedef struct brick
     bool    is_dead;
 } brick;
 
-void process_input(float dt);
-void init_level(int level_index);
+void process_input(float);
+void init_level(int);
 
 void render_player(void);
 void render_ball(void);
@@ -73,8 +74,10 @@ void render_at_center(const char *, float, Color);
 void render_menu(void);
 void render_level_completed(int);
 
-void  update_ball(float dt);
-void  update_player(void);
+void update_ball(float);
+void update_player(void);
+void update_bricks(ball *);
+
 bool  check_collision(Vector2, int, int, Vector2, int, int);
 float calculate_distance_from_centers(void);
 void  bounce_off_paddle();
@@ -106,23 +109,39 @@ paddle player = {
 };
 
 ball b = {
-    .width       = BALL_WIDTH,
-    .height      = BALL_HEIGHT,
-    .direction.x = 0.5f,
-    .direction.y = 1,
-    .color       = GREEN,
+    .width         = BALL_WIDTH,
+    .height        = BALL_HEIGHT,
+    .direction.x   = 0.5f,
+    .direction.y   = 1,
+    .color         = GREEN,
+    .out_of_bounds = false,
 };
 
+// TODO: This level system sucks
 brick bricks[GRID_ROWS * GRID_COLS];
 
 int level_bricks_count;
 
 char levels[MAX_LEVELS][GRID_ROWS][GRID_COLS] = {
-    {"rrrrrrrrrr", "..........", "..........", "..........", ".........."},
-    {"r.r.r.r.r.", ".v.v.v.v.v", "g.g.g.g.g.", "b.b.b.b.b.", ".p.p.p.p.p"},
+    {
+        "..........",
+        "..........",
+        "....g.....",
+        "..........",
+    },
+    {
+        "rrrrrrrrrr",
+        "rrrrrrrrrr",
+        "gggggggggg",
+        "gggggggggg",
+        "bbbbbbbbbb",
+    },
+    // {"r.r.r.r.r.", ".v.v.v.v.v", "g.g.g.g.g.", "b.b.b.b.b.", ".p.p.p.p.p"},
 };
 
 // What does the game do? Keeps its state and levels.
+
+bool control_ball = true;
 
 int main(void)
 {
@@ -133,128 +152,228 @@ int main(void)
     Sound collision_sound = LoadSound("assets/collision.mp3");
 
     // Initialize the first level
-    //
     // Level index
     // Levels
     // Level bricks count
-    init_level(g.level_index);
+    // init_level(g.level_index);
+
+    brick test_brick = {
+        .color      = ORANGE,
+        .width      = BRICK_WIDTH,
+        .height     = BRICK_HEIGHT,
+        .position.x = 500,
+        .position.y = 500,
+    };
 
     // Main game loop
     while (!WindowShouldClose())
     {
         // Update
-        //----------------------------------------------------------------------------------
         float dt = GetFrameTime();
         process_input(dt);
 
-        if (g.level_index == MAX_LEVELS)
+        update_player();
+        update_ball(dt);
+        // update_bricks(&b);
+
+        // Collision: Ball and Player
+        // -----------------------------------
+        if (b.position.x + b.width > player.position.x && b.position.x < player.position.x + player.width &&
+            b.position.y + b.height > player.position.y && b.position.y < player.position.y + player.height)
         {
-            g.mode = FINISH;
+            bounce_off_paddle();
         }
 
-        if (level_bricks_count == 0)
+        // Collision: Ball and Test Brick
+        // -----------------------------------
+        if (b.position.x + b.width > test_brick.position.x && b.position.x < test_brick.position.x + test_brick.width &&
+            b.position.y + b.height > test_brick.position.y && b.position.y < test_brick.position.y + test_brick.height)
         {
-            g.mode = COMPLETED;
+            DrawText("Ball We have collision \n", 100, 50, 32, YELLOW);
+			// Now we need to check all conditions
+			float ball_top_side    = b.position.y;
+			float ball_bottom_side = b.position.y + b.height;
+			float ball_left_side   = b.position.x;
+			float ball_right_side  = b.position.x + b.width;
+
+			float brick_top_side    = test_brick.position.y;
+			float brick_bottom_side = test_brick.position.y + test_brick.height;
+			float brick_left_side   = test_brick.position.x;
+			float brick_right_side  = test_brick.position.x + test_brick.width;
+
+			// NOTE: This method has a bug for the corner cases
+
+			// Ball hits from top
+			if (ball_left_side   > brick_left_side  &&
+				ball_right_side  < brick_right_side &&
+				ball_bottom_side > brick_top_side   &&
+				ball_top_side    < brick_top_side
+				)
+			{
+				b.direction.y *= -1;
+            	DrawText("Ball hits from top \n", 100, 100, 32, GREEN);
+			}
+
+			// Ball hits from bottom
+			if (ball_left_side   > brick_left_side   &&
+				ball_right_side  < brick_right_side  &&
+				ball_top_side    < brick_bottom_side &&
+				ball_bottom_side > brick_bottom_side
+				)
+			{
+            	DrawText("Ball hits from bottom \n", 100, 100, 32, GREEN);
+				b.direction.y *= -1;
+			}
+
+			// Ball hits from right
+			if (ball_top_side    > brick_top_side    &&
+				ball_bottom_side < brick_bottom_side &&
+				ball_right_side  > brick_right_side  &&
+				ball_left_side   < brick_right_side
+					)
+			{
+            	DrawText("Ball hits from right \n", 100, 100, 32, GREEN);
+				b.direction.x *= -1;
+			}
+
+			// Ball hits from left
+			if (ball_top_side    > brick_top_side    &&
+				ball_bottom_side < brick_bottom_side &&
+				ball_left_side   < brick_left_side   &&
+				ball_right_side  > brick_left_side
+					)
+			{
+				b.direction.x *= -1;
+            	DrawText("Ball hits from left \n", 100, 100, 32, GREEN);
+			}
+
+			// // Ball hits from right
+			// if (ball_bottom_side > brick_bottom_side &&
+			// 	ball_top_side    < brick_top_side    &&
+			// 	ball_left_side   < brick_left_side   &&
+			// 	ball_right_side  > brick_left_side
+			// 	)
+			// {
+			//          	DrawText("Ball hits from left \n", 100, 100, 32, GREEN);
+			// }
+
+			//
+			// // Ball hits from bottom
+			// if (ball_left_side   > brick_left_side &&
+			// 	ball_right_side  < brick_right_side &&
+			// 	ball_bottom_side < brick_bottom_side &&
+			// 	ball_top_side    > brick_bottom_side
+			// 	)
+			// {
+			//          	DrawText("Ball hits from bottom \n", 100, 100, 32, GREEN);
+			// }
+
+			// // Ball is either left or right
+			// if (b.position.y > test_brick.position.y &&
+			// 	b.position.y < test_brick.position.y + test_brick.height &&
+			// 	b.position.x < test_brick.position.x
+			// 	)
+			// {
+			//          	DrawText("Ball is on the right \n", 100, 100, 32, GREEN);
+			// 	b.direction.x *= -1;
+			// }
+			//
+			// if (b.position.y > test_brick.position.y &&
+			// 	b.position.y < test_brick.position.y + test_brick.height &&
+			// 	b.position.x > test_brick.position.x
+			// 	)
+			// {
+			//          	DrawText("Ball is on the left \n", 100, 100, 32, GREEN);
+			// 	b.direction.x *= -1;
+			// }
+        }
+        // -----------------------------------
+
+        if (b.out_of_bounds)
+        {
+            player.lives--;
+            reset_positions();
+            b.out_of_bounds = false;
+            g.mode          = START;
         }
 
-        if (g.mode == START)
-        {
-            update_player();
-            update_ball(dt);
-        }
-        else if (g.mode == PLAY)
-        {
-            update_player();
-            update_ball(dt);
-
-            if (check_collision(b.position, b.width, b.height, player.position, player.width, player.height))
-            {
-                bounce_off_paddle();
-            }
-
-            for (int i = 0; i < sizeof(bricks) / sizeof(brick); ++i)
-            {
-                if (bricks[i].is_dead)
-                    continue;
-
-                // NOTE: Calculate ball direction depending on where it hit the
-                // brick Also there is a big if you hit the brick on the side
-                if (check_collision(b.position, b.width, b.height, bricks[i].position, bricks[i].width,
-                                    bricks[i].height))
-                {
-                    b.direction.y *= -1;
-                    bricks[i].lives--;
-                    if (bricks[i].lives == 0)
-                    {
-                        bricks[i].is_dead = true;
-                        level_bricks_count--;
-                    }
-                    else
-                    {
-                        bricks[i].color = ColorAlpha(bricks[i].color, 0.5f);
-                    }
-                }
-            }
-        }
-
-        // Only in the end check if the player was dead
         if (player.lives <= 0)
         {
             g.mode = OVER;
         }
 
+        // if (g.level_index == MAX_LEVELS - 1)
+        // {
+        //     g.mode = FINISH;
+        // }
+        //
+        // if (level_bricks_count == 0)
+        // {
+        //     g.mode = COMPLETED;
+        // }
+
         // Draw
-        //----------------------------------------------------------------------------------
         BeginDrawing();
         ClearBackground(BLACK);
 
         render_debug_info();
 
-        //
-        // Render Bricks Grid
-        //
+        DrawText(TextFormat("Brick positition x: %.0f y: %.0f", test_brick.position.x, test_brick.position.y), 100.0f,
+                 SCREEN_HEIGHT - 200.0f, 32, GREEN);
+
+        DrawRectangle(test_brick.position.x, test_brick.position.y, test_brick.width, test_brick.height,
+                      test_brick.color);
+
         switch (g.mode)
         {
         case MENU:
+        {
             render_at_center("PAUSE", 64.0f, PURPLE);
-            break;
+        }
+        break;
         case OVER:
+        {
             render_at_center("GAME OVER", 64.0f, RED);
-            break;
+        }
+        break;
         case START:
+        {
             render_at_center("Press SPACE to start", 64.0f, GREEN);
             render_player();
             render_ball();
-            render_bricks();
-            break;
+            // render_bricks();
+        }
+        break;
         case PLAY:
+        {
             render_player();
             render_ball();
-            render_bricks();
-            break;
-        case COMPLETED:
-            g.level_index++;
-            render_level_completed(g.level_index);
-            init_level(g.level_index);
-            g.mode = START;
-            break;
-        case FINISH:
-            render_at_center("GAME COMPLETED. \nThank you for playing.", 64.0f, RED);
-            break;
+            // render_bricks();
+        }
+        break;
+        // case COMPLETED:
+        // {
+        //     g.level_index++;
+        //     render_level_completed(g.level_index);
+        //     init_level(g.level_index);
+        //     g.mode = START;
+        // }
+        // break;
+        // case FINISH:
+        // {
+        //     render_at_center("GAME COMPLETED.", 64.0f, GREEN);
+        // }
+        // break;
         default:
             break;
         }
 
         EndDrawing();
-        //----------------------------------------------------------------------------------
     }
 
-    // De-Initialization
-    //--------------------------------------------------------------------------------------
     UnloadSound(collision_sound);
     CloseAudioDevice();
     CloseWindow();
-    //--------------------------------------------------------------------------------------
 
     return 0;
 }
@@ -269,6 +388,11 @@ void process_input(float dt)
     {
         player.position.x += PADDLE_SPEED * dt;
     }
+    else if (IsKeyPressed(KEY_C))
+    {
+        control_ball = !control_ball;
+    }
+
     else if (IsKeyPressed(KEY_SPACE))
     {
         g.mode = PLAY;
@@ -324,7 +448,7 @@ void init_level(int level_index)
                     new_brick.color = RED;
                     break;
                 case 'g':
-                    new_brick.color = GREEN;
+                    new_brick.color = GOLD;
                     break;
                 case 'b':
                     new_brick.color = BLUE;
@@ -334,6 +458,8 @@ void init_level(int level_index)
                     break;
                 case 'p':
                     new_brick.color = PINK;
+                    break;
+                default:
                     break;
                 }
 
@@ -367,10 +493,8 @@ float calculate_distance_from_centers()
     Vector2 b1 = b.position;
     b1.x += (float)b.width / 2;
 
-    float distance = b1.x - p1.x;
-    distance       = distance / 100;
-
-    distance = Clamp(distance, -1.0, 1.0);
+    float distance = (b1.x - p1.x) / 100;
+    distance       = Clamp(distance, -1.0, 1.0);
 
     return distance;
 }
@@ -389,6 +513,16 @@ void bounce_off_paddle()
 
 void update_ball(float dt)
 {
+    if (control_ball)
+    {
+        Vector2 mouse_position = GetMousePosition();
+
+        b.position.x = mouse_position.x;
+        b.position.y = mouse_position.y;
+
+        return;
+    }
+
     if (g.mode == START)
     {
         reset_ball_position();
@@ -406,12 +540,9 @@ void update_ball(float dt)
         {
             b.direction.x = 1;
         }
-        // adding a little bit of space for ball to drop
-        if (b.position.y >= SCREEN_HEIGHT + 10)
+        if (b.position.y >= SCREEN_HEIGHT)
         {
-            player.lives--;
-            reset_ball_position();
-            g.mode = START;
+            b.out_of_bounds = true;
         }
         else if (b.position.y <= 0)
         {
@@ -420,20 +551,44 @@ void update_ball(float dt)
     }
 }
 
-void update_bricks() {}
+void update_bricks(ball *b)
+{
+    for (int i = 0; i < sizeof(bricks) / sizeof(brick); ++i)
+    {
+        if (bricks[i].is_dead)
+            continue;
+
+        // NOTE: Calculate ball direction depending on where it hit the
+        // brick Also there is a big if you hit the brick on the side
+        // if (check_collision(b->position, b->width, b->height, bricks[i].position, bricks[i].width, bricks[i].height))
+        // {
+        //     b->direction.y *= -1;
+        //
+        //     bricks[i].lives--;
+        //     if (bricks[i].lives == 0)
+        //     {
+        //         bricks[i].is_dead = true;
+        //         level_bricks_count--;
+        //     }
+        //     else
+        //     {
+        //         bricks[i].color = ColorAlpha(bricks[i].color, 0.5f);
+        //     }
+        // }
+    }
+}
 
 void reset_ball_position()
 {
     b.position.x  = player.position.x + ((float)player.width / 2) - (float)b.width / 2;
     b.position.y  = player.position.y - player.height;
     b.direction.y = -1;
+    b.direction.x = 0;
 }
 
 void reset_positions()
 {
-    b.position.x  = player.position.x + ((float)player.width / 2) - (float)b.width / 2;
-    b.position.y  = player.position.y - player.height;
-    b.direction.y = -1;
+    reset_ball_position();
 
     player.position.x = ((float)SCREEN_WIDTH / 2) - (float)PADDLE_WIDTH / 2;
     player.position.y = SCREEN_HEIGHT - PADDLE_HEIGHT;
@@ -461,26 +616,13 @@ void render_at_center(const char *text, float font_size, Color color)
 }
 
 // Render Functions
-// NOTE: Menu will include replaying episodes later
+// NOTE: Menu will include replaying levels later
 void render_menu() { render_at_center("PAUSE", 64.0f, PURPLE); }
 
 void render_level_completed(int level_number)
 {
     const char *text = TextFormat("Level Completed %i", level_number);
     render_at_center(text, 64.0f, GREEN);
-}
-
-void render_debug_info()
-{
-    float       font_size = 32.0f;
-    const char *text      = TextFormat("Level Bricks Count = %i", level_bricks_count);
-    DrawText(text, 100.0f, SCREEN_HEIGHT - 100.0f, font_size, GREEN);
-}
-
-void render_screen_center()
-{
-    DrawLine(0, SCREEN_HEIGHT / 2, SCREEN_WIDTH, SCREEN_HEIGHT / 2, PURPLE);
-    DrawLine(SCREEN_WIDTH / 2, 0, SCREEN_WIDTH / 2, SCREEN_HEIGHT, PURPLE);
 }
 
 void render_player() { DrawRectangle(player.position.x, player.position.y, player.width, player.height, BLUE); }
@@ -515,4 +657,16 @@ void kill_brick()
             level_bricks_count--;
         }
     }
+}
+
+void render_debug_info()
+{
+    DrawText(TextFormat("Ball positition x: %.0f y: %.0f", b.position.x, b.position.y), 100.0f, SCREEN_HEIGHT - 100.0f,
+             32, GREEN);
+}
+
+void render_screen_center()
+{
+    DrawLine(0, SCREEN_HEIGHT / 2, SCREEN_WIDTH, SCREEN_HEIGHT / 2, PURPLE);
+    DrawLine(SCREEN_WIDTH / 2, 0, SCREEN_WIDTH / 2, SCREEN_HEIGHT, PURPLE);
 }
