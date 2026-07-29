@@ -3,6 +3,14 @@
 Learn C by making breakout.
 
 
+## References:
+
+- https://learnopengl.com/In-Practice/2D-Game/Collisions/Collision-detection
+- https://learnopengl.com/In-Practice/2D-Game/Collisions/Collision-resolution
+- Collision Detection - https://happycoding.io/tutorials/processing/collision-detection#rectangle-rectangle-collision-detection
+
+
+
 ## Bugs:
 
 - [x] Center the text

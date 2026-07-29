@@ -5,8 +5,8 @@ CC      := $(W64DEVKIT)/gcc.exe
 CFLAGS  := -I$(RAYLIB_SRC) -Wall -g
 LDFLAGS := -L$(RAYLIB_SRC) -lraylib -lopengl32 -lgdi32 -lwinmm -B$(W64DEVKIT)
 
-TARGET := main.exe
-SRC    := main.c
+TARGET := collision.exe
+SRC    := collision.c
 
 .PHONY: all run clean
 

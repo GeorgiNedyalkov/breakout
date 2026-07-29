@@ -51,6 +51,7 @@ typedef struct ball
     Vector2 direction;
     Color   color;
     bool    out_of_bounds;
+    int     speed;
 } ball;
 
 typedef struct brick
@@ -115,6 +116,7 @@ ball b = {
     .direction.y   = 1,
     .color         = GREEN,
     .out_of_bounds = false,
+    .speed         = BALL_SPEED,
 };
 
 // TODO: This level system sucks
@@ -161,8 +163,8 @@ int main(void)
         .color      = ORANGE,
         .width      = BRICK_WIDTH,
         .height     = BRICK_HEIGHT,
-        .position.x = 500,
-        .position.y = 500,
+        .position.x = 4500,
+        .position.y = 4500,
     };
 
     // Main game loop
@@ -186,108 +188,25 @@ int main(void)
 
         // Collision: Ball and Test Brick
         // -----------------------------------
-        if (b.position.x + b.width > test_brick.position.x && b.position.x < test_brick.position.x + test_brick.width &&
-            b.position.y + b.height > test_brick.position.y && b.position.y < test_brick.position.y + test_brick.height)
-        {
-            DrawText("Ball We have collision \n", 100, 50, 32, YELLOW);
-			// Now we need to check all conditions
-			float ball_top_side    = b.position.y;
-			float ball_bottom_side = b.position.y + b.height;
-			float ball_left_side   = b.position.x;
-			float ball_right_side  = b.position.x + b.width;
+        // Moving objects collision
+        // If we keep moving in our current x and y directions are we going to collide with the object
 
-			float brick_top_side    = test_brick.position.y;
-			float brick_bottom_side = test_brick.position.y + test_brick.height;
-			float brick_left_side   = test_brick.position.x;
-			float brick_right_side  = test_brick.position.x + test_brick.width;
+		if (b.position.x + b.width > test_brick.position.x &&
+			b.position.x < test_brick.position.x + test_brick.width &&
+			b.position.y + b.height > test_brick.position.y &&
+			b.position.y < test_brick.position.y + test_brick.height)
+		{
 
-			// NOTE: This method has a bug for the corner cases
+			b.direction.x *= -1;
+		}
 
-			// Ball hits from top
-			if (ball_left_side   > brick_left_side  &&
-				ball_right_side  < brick_right_side &&
-				ball_bottom_side > brick_top_side   &&
-				ball_top_side    < brick_top_side
-				)
-			{
-				b.direction.y *= -1;
-            	DrawText("Ball hits from top \n", 100, 100, 32, GREEN);
-			}
-
-			// Ball hits from bottom
-			if (ball_left_side   > brick_left_side   &&
-				ball_right_side  < brick_right_side  &&
-				ball_top_side    < brick_bottom_side &&
-				ball_bottom_side > brick_bottom_side
-				)
-			{
-            	DrawText("Ball hits from bottom \n", 100, 100, 32, GREEN);
-				b.direction.y *= -1;
-			}
-
-			// Ball hits from right
-			if (ball_top_side    > brick_top_side    &&
-				ball_bottom_side < brick_bottom_side &&
-				ball_right_side  > brick_right_side  &&
-				ball_left_side   < brick_right_side
-					)
-			{
-            	DrawText("Ball hits from right \n", 100, 100, 32, GREEN);
-				b.direction.x *= -1;
-			}
-
-			// Ball hits from left
-			if (ball_top_side    > brick_top_side    &&
-				ball_bottom_side < brick_bottom_side &&
-				ball_left_side   < brick_left_side   &&
-				ball_right_side  > brick_left_side
-					)
-			{
-				b.direction.x *= -1;
-            	DrawText("Ball hits from left \n", 100, 100, 32, GREEN);
-			}
-
-			// // Ball hits from right
-			// if (ball_bottom_side > brick_bottom_side &&
-			// 	ball_top_side    < brick_top_side    &&
-			// 	ball_left_side   < brick_left_side   &&
-			// 	ball_right_side  > brick_left_side
-			// 	)
-			// {
-			//          	DrawText("Ball hits from left \n", 100, 100, 32, GREEN);
-			// }
-
-			//
-			// // Ball hits from bottom
-			// if (ball_left_side   > brick_left_side &&
-			// 	ball_right_side  < brick_right_side &&
-			// 	ball_bottom_side < brick_bottom_side &&
-			// 	ball_top_side    > brick_bottom_side
-			// 	)
-			// {
-			//          	DrawText("Ball hits from bottom \n", 100, 100, 32, GREEN);
-			// }
-
-			// // Ball is either left or right
-			// if (b.position.y > test_brick.position.y &&
-			// 	b.position.y < test_brick.position.y + test_brick.height &&
-			// 	b.position.x < test_brick.position.x
-			// 	)
-			// {
-			//          	DrawText("Ball is on the right \n", 100, 100, 32, GREEN);
-			// 	b.direction.x *= -1;
-			// }
-			//
-			// if (b.position.y > test_brick.position.y &&
-			// 	b.position.y < test_brick.position.y + test_brick.height &&
-			// 	b.position.x > test_brick.position.x
-			// 	)
-			// {
-			//          	DrawText("Ball is on the left \n", 100, 100, 32, GREEN);
-			// 	b.direction.x *= -1;
-			// }
-        }
-        // -----------------------------------
+		if (b.position.x + b.width > test_brick.position.x &&
+			b.position.x < test_brick.position.x + test_brick.width &&
+			b.position.y + b.height > test_brick.position.y &&
+			b.position.y > test_brick.position.y + test_brick.height)
+		{
+			b.direction.y *= -1;
+		}
 
         if (b.out_of_bounds)
         {
@@ -494,6 +413,7 @@ float calculate_distance_from_centers()
     b1.x += (float)b.width / 2;
 
     float distance = (b1.x - p1.x) / 100;
+
     distance       = Clamp(distance, -1.0, 1.0);
 
     return distance;
@@ -501,6 +421,7 @@ float calculate_distance_from_centers()
 
 void bounce_off_paddle()
 {
+	// NOTE: See if here we need to resolve the collision before we change the direction
     float distance = calculate_distance_from_centers();
 
     Vector2 new_direction;
@@ -529,8 +450,8 @@ void update_ball(float dt)
     }
     else
     {
-        b.position.x += b.direction.x * BALL_SPEED * dt;
-        b.position.y += b.direction.y * BALL_SPEED * dt;
+        b.position.x += b.direction.x * b.speed * dt;
+        b.position.y += b.direction.y * b.speed * dt;
 
         if (b.position.x >= SCREEN_WIDTH - BALL_WIDTH)
         {
