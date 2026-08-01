@@ -1,0 +1,4 @@
+CompileFlags:
+  Add:
+    - -IC:\lib\raylib-6.0_win64_msvc16\include
+    - -DPLATFORM_DESKTOP
