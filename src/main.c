@@ -91,9 +91,11 @@ Vector2 get_text_center(const char *, float);
 void update_ball(float dt);
 void update_player(void);
 
-bool        check_collision(Vector2, int, int, Vector2, int, int);
-float       calculate_distance_from_centers(void);
+bool  check_collision(Vector2, int, int, Vector2, int, int);
+float calculate_distance_from_centers(void);
+
 direction_t get_hit_direction(Vector2);
+Vector2     get_closest_point(ball, brick);
 
 void bounce_off_paddle(void);
 void reset_positions(void);
@@ -112,7 +114,7 @@ char levels[MAX_LEVELS][GRID_ROWS][GRID_COLS] = {
     {
         "..........",
         "..........",
-        "....g.....",
+        "..........",
         "..........",
         "..........",
     },
@@ -155,14 +157,14 @@ int main(void)
     b.direction.y = 1;
     b.color       = GREEN;
 
-    brick test_b;
-    test_b.width      = BRICK_WIDTH;
-    test_b.height     = BRICK_HEIGHT;
-    test_b.position.x = 500;
-    test_b.position.y = 400;
-    test_b.is_dead    = false;
-    test_b.lives      = 1;
-    test_b.color      = ORANGE;
+    // brick test_b;
+    // test_b.width      = BRICK_WIDTH;
+    // test_b.height     = BRICK_HEIGHT;
+    // test_b.position.x = 500;
+    // test_b.position.y = 400;
+    // test_b.is_dead    = false;
+    // test_b.lives      = 1;
+    // test_b.color      = ORANGE;
 
     // Initialize the first level
     // Level index
@@ -172,6 +174,21 @@ int main(void)
 
     while (!WindowShouldClose())
     {
+        if (player.lives <= 0)
+        {
+            g.mode = OVER;
+        }
+
+        if (g.level_index == MAX_LEVELS)
+        {
+            g.mode = FINISH;
+        }
+
+        if (level_bricks_count == 0)
+        {
+            g.mode = COMPLETED;
+        }
+
         float dt = GetFrameTime();
         process_input(dt);
 
@@ -190,159 +207,79 @@ int main(void)
                 bounce_off_paddle();
             }
 
+			// NOTE: (Optimization) Here if there are no bricks in the level don't continue in the loop
             for (int i = 0; i < sizeof(bricks) / sizeof(brick); ++i)
             {
-                brick curr_brick = bricks[i];
-
-                if (curr_brick.is_dead)
+                if (bricks[i].is_dead)
                     continue;
 
-                //             // Get the centers of both objects
-                //             Vector2 ball_center  = {b.position.x + (b.width / 2.0), b.position.y + (b.height / 2.0)};
-                //             Vector2 brick_center = {curr_brick.position.x + (curr_brick.width / 2.0),
-                //                                     curr_brick.position.y + (curr_brick.height / 2.0)};
-                //
-                // // Calculate the vector from the centers
-                //             Vector2 distance_from_centers = {ball_center.x - brick_center.x, ball_center.y -
-                //             brick_center.y};
-                //
-                // // Add it back to the rect center
-                // distance_from_centers.x += brick_center.x;
-                // distance_from_centers.y += brick_center.y;
-                //
-                // // Get the closest point and clamp it to the brick dimensions
-                //             Vector2 closest_point;
-                //             closest_point.x = Clamp(distance_from_centers.x, -curr_brick.width / 2.0,
-                //             curr_brick.width / 2.0); closest_point.y = Clamp(distance_from_centers.y,
-                //             -curr_brick.height / 2.0, curr_brick.height / 2.0);
-                //             // We need to clamp here
-                //
-                //             direction_t hit_direction = get_hit_direction(closest_point);
-                //             printf("Hit Direction: %d\n", hit_direction);
-
-                // NOTE: Calculate ball direction depending on where it hit the
-                // brick Also there is a big if you hit the brick on the side
-                if (check_collision(b.position, b.width, b.height, curr_brick.position, curr_brick.width,
-                                    curr_brick.height))
+                if (check_collision(b.position, b.width, b.height, bricks[i].position, bricks[i].width,
+                                    bricks[i].height))
                 {
+                    bricks[i].lives--;
+                    if (bricks[i].lives == 0)
+                    {
+                        bricks[i].is_dead = true;
+                        level_bricks_count--;
+                    }
+                    else
+                    {
+                        bricks[i].color = ColorAlpha(bricks[i].color, 0.5f);
+                    }
+
                     // NOTE: Collision Resolution and ball direction
                     // Resolution and direction need to happen here
+                    Vector2     closest_point = get_closest_point(b, bricks[i]);
+                    direction_t hit_direction = get_hit_direction(closest_point);
 
-                    // Find the ball direction using the dot product
+                    if (hit_direction == EAST || hit_direction == WEST)
+                    {
+                        b.direction.x *= -1;
+                    }
+                    else if (hit_direction == NORTH || hit_direction == SOUTH)
+                    {
+                        b.direction.y *= -1;
+                    }
 
-                    b.direction.y *= -1;
-
+                    // NOTE: WE have no resolution for now
                     // If we have a hit
-                    // curr_brick.lives--;
-                    // if (curr_brick.lives == 0)
-                    // {
-                    //     curr_brick.is_dead = true;
-                    //     level_bricks_count--;
-                    // }
-                    // else
-                    // {
-                    //     curr_brick.color = ColorAlpha(curr_brick.color, 0.5f);
-                    // }
                 }
             }
         }
-
-        if (player.lives <= 0)
-        {
-            g.mode = OVER;
-        }
-
-        if (g.level_index == MAX_LEVELS)
-        {
-            g.mode = FINISH;
-        }
-
-        if (level_bricks_count == 0)
-        {
-            g.mode = COMPLETED;
-        }
-
-        // Get the centers of both objects
-        Vector2 ball_center = {
-            b.position.x + (b.width / 2.0),
-            b.position.y + (b.height / 2.0),
-        };
-        Vector2 brick_center = {
-            test_b.position.x + (test_b.width / 2.0),
-            test_b.position.y + (test_b.height / 2.0),
-        };
-
-        // Calculate the vector from the centers
-        Vector2 distance_from_centers = {
-            ball_center.x - brick_center.x,
-            ball_center.y - brick_center.y,
-        };
-
-        distance_from_centers.x = Clamp(distance_from_centers.x, -test_b.width / 2.0, test_b.width / 2.0);
-        distance_from_centers.y = Clamp(distance_from_centers.y, -test_b.height / 2.0, test_b.height / 2.0);
-
-        // Add it back to the rect center
-        Vector2 closest_point = {brick_center.x + distance_from_centers.x, brick_center.y + distance_from_centers.y};
-
-        // Get the Hit Direction
-        Vector2 circle_to_closest = {
-            ball_center.x - closest_point.x,
-            ball_center.y - closest_point.y,
-        };
-
-        direction_t hit_direction = get_hit_direction(circle_to_closest);
-
-        printf("Hit Direction: %d\n", hit_direction);
-
         BeginDrawing();
         ClearBackground(BLACK);
 
-        DrawRectangle(brick_center.x, brick_center.y, 1, 1, RED);
-        DrawRectangle(ball_center.x, ball_center.y, 1, 1, RED);
-        DrawLine(0, 0, brick_center.x, brick_center.y, YELLOW);
-        DrawLine(0, 0, ball_center.x, ball_center.y, YELLOW);
-
-        DrawLine(ball_center.x, ball_center.y, closest_point.x, closest_point.y, BLUE);
-        DrawRectangleLines(test_b.position.x, test_b.position.y, test_b.width, test_b.height, test_b.color);
-        DrawCircleLines(closest_point.x, closest_point.y, 5.0, BLUE);
-
-        const char *cp_text = TextFormat("Closest point x: %.0f, y:%.0f", closest_point.x, closest_point.y);
-        DrawText(cp_text, 50, 800, 20, GREEN);
-
-        render_ball();
-        render_player();
-
-        // switch (g.mode)
-        // {
-        // case MENU:
-        //     render_at_center("PAUSE", 64.0f, PURPLE);
-        //     break;
-        // case OVER:
-        //     render_at_center("GAME OVER", 64.0f, RED);
-        //     break;
-        // case START:
-        //     // render_at_center("Press SPACE to start", 64.0f, GREEN);
-        //     render_player();
-        //     render_ball();
-        //     render_bricks();
-        //     break;
-        // case PLAY:
-        //     render_player();
-        //     render_ball();
-        //     render_bricks();
-        //     break;
-        // case COMPLETED:
-        //     g.level_index++;
-        //     render_level_completed(g.level_index);
-        //     init_level(g.level_index);
-        //     g.mode = START;
-        //     break;
-        // case FINISH:
-        //     render_at_center("GAME COMPLETED.", 64.0f, GOLD);
-        //     break;
-        // default:
-        //     break;
-        // }
+        switch (g.mode)
+        {
+        case MENU:
+            render_at_center("PAUSE", 64.0f, PURPLE);
+            break;
+        case OVER:
+            render_at_center("GAME OVER", 64.0f, RED);
+            break;
+        case START:
+            render_at_center("Press SPACE to start", 64.0f, GREEN);
+            render_player();
+            render_ball();
+            render_bricks();
+            break;
+        case PLAY:
+            render_player();
+            render_ball();
+            render_bricks();
+            break;
+        case COMPLETED:
+            g.level_index++;
+            render_level_completed(g.level_index);
+            init_level(g.level_index);
+            g.mode = START;
+            break;
+        case FINISH:
+            render_at_center("GAME COMPLETED.", 64.0f, GOLD);
+            break;
+        default:
+            break;
+        }
 
         EndDrawing();
     }
@@ -364,7 +301,8 @@ void process_input(float dt)
     {
         player.position.x += PADDLE_SPEED * dt;
     }
-    else if (IsKeyPressed(KEY_ESCAPE))
+
+    if (IsKeyPressed(KEY_ESCAPE))
     {
         WindowShouldClose();
     }
@@ -397,8 +335,7 @@ void process_input(float dt)
 // TODO: This has bugs and I don't understand the initialization of current_level
 void init_level(int level_index)
 {
-    level_bricks_count = 0;
-
+    level_bricks_count               = 0;
     char (*current_level)[GRID_COLS] = levels[level_index];
 
     for (int row = 0; row < GRID_ROWS; ++row)
@@ -438,6 +375,9 @@ void init_level(int level_index)
                     break;
                 case 'p':
                     new_brick.color = PINK;
+                    break;
+                default:
+                    bricks->color = YELLOW;
                     break;
                 }
 
@@ -515,7 +455,7 @@ void update_ball(float dt)
         {
             b.direction.x = 1;
         }
-        // adding a little bit of space for ball to drof
+        // adding a little bit of space for the ball to drop
         if (b.position.y >= SCREEN_HEIGHT + 10)
         {
             player.lives--;
@@ -626,6 +566,56 @@ void kill_brick(void)
     }
 }
 
+// Returns the closest point from the ball center to the brick
+// used to determine the hit direction later
+Vector2 get_closest_point(ball b, brick test_b)
+{
+    // Get the centers of both objects
+    Vector2 ball_center = {
+        b.position.x + (b.width / 2.0),
+        b.position.y + (b.height / 2.0),
+    };
+    Vector2 brick_center = {
+        test_b.position.x + (test_b.width / 2.0),
+        test_b.position.y + (test_b.height / 2.0),
+    };
+
+    // Calculate the vector from the centers
+    Vector2 distance_from_centers = {
+        ball_center.x - brick_center.x,
+        ball_center.y - brick_center.y,
+    };
+
+    distance_from_centers.x = Clamp(distance_from_centers.x, -test_b.width / 2.0, test_b.width / 2.0);
+    distance_from_centers.y = Clamp(distance_from_centers.y, -test_b.height / 2.0, test_b.height / 2.0);
+
+    // Add it back to the rect center
+    Vector2 closest_point = {brick_center.x + distance_from_centers.x, brick_center.y + distance_from_centers.y};
+
+    // Get the Hit Direction
+    Vector2 circle_to_closest = {
+        ball_center.x - closest_point.x,
+        ball_center.y - closest_point.y,
+    };
+
+    // NOTE: Debug only
+    // Learn how to use these only in debug mode
+
+    // DrawRectangle(brick_center.x, brick_center.y, 1, 1, RED);
+    // DrawRectangle(ball_center.x, ball_center.y, 1, 1, RED);
+    // DrawLine(0, 0, brick_center.x, brick_center.y, YELLOW);
+    // DrawLine(0, 0, ball_center.x, ball_center.y, YELLOW);
+    //
+    // DrawLine(ball_center.x, ball_center.y, closest_point.x, closest_point.y, BLUE);
+    // DrawRectangleLines(test_b.position.x, test_b.position.y, test_b.width, test_b.height, test_b.color);
+    // DrawCircleLines(closest_point.x, closest_point.y, 5.0, BLUE);
+    //
+    // const char *cp_text = TextFormat("Closest point x: %.0f, y:%.0f", closest_point.x, closest_point.y);
+    // DrawText(cp_text, 50, 800, 20, GREEN);
+    //
+    return circle_to_closest;
+}
+
 direction_t get_hit_direction(Vector2 target)
 {
     // EAST, WEST, NORTH, SOUTH
@@ -647,6 +637,9 @@ direction_t get_hit_direction(Vector2 target)
             best_match = i;
         }
     }
+
+    // NOTE: Debug only
+    // printf("Hit Direction: %d\n", hit_direction);
 
     return (direction_t)best_match;
 }
