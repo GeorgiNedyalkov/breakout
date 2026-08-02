@@ -2,6 +2,45 @@
 
 Learn C by making breakout.
 
+## Contributionsc
+
+Thank you NoCopyrightSound633 for the music!
+
+Music by [NoCopyrightSound633](https://pixabay.com/users/nocopyrightsound633-47610058/) from [Pixabay](https://pixabay.com/)
+
+Sound Effects by [freesound_community-46691455](https://pixabay.com/users/freesound_community-46691455/)
+
+## How to put our own twist?
+
+How do we make the game fun or interesting in our own way?
+- Visuals
+- Sound
+- Gameplay
+
+## TODO
+
+- [x] Fix paddle and ball collision bug
+- [x] Increase ball speed by some percentage when a brick dies
+
+- [] Fix level initialization bugs and game state
+- [] Fix game dimensions and level design
+- [] Fix game state transitions
+
+- [x] Add sound and music
+- [] Add muffled sound effect when paused
+
+- [x] Add a way to view lives
+- [x] Add a way to see score
+- [] Align them properly
+- [] Add background
+
+- [] Do we make different game modes?
+- [] Do we reset the lives at each level?
+
+## Bugs
+- [] Pressing Space makes the game start and flashes after game is completed
+- [] Speed may be increasing when the sides are hit
+
 ## References
 
 - https://github.com/raysan5/raylib/wiki/Working-on-Windows
