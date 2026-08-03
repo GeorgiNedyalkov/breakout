@@ -10,11 +10,11 @@
 #define SCREEN_HEIGHT       800
 #define GRID_COLS           10
 #define GRID_ROWS           5
-
+#define BRICKS_PER_ROW      10
+#define BRICK_WIDTH         SCREEN_WIDTH / BRICKS_PER_ROW
+#define BRICK_HEIGHT        40
 #define MAX_LEVELS          4
-#define BRICK_WIDTH         150
-#define BRICK_HEIGHT        50
-#define PADDLE_WIDTH        200
+#define PADDLE_WIDTH        100
 #define PADDLE_HEIGHT       25
 #define PADDLE_SPEED        1200
 #define PLAYER_LIVES        3
@@ -114,34 +114,34 @@ ball   b;
 brick  bricks[GRID_ROWS * GRID_COLS];
 
 char levels[MAX_LEVELS][GRID_ROWS][GRID_COLS] = {
-	{
-		"..........",
-		".pppppppp.",
-		"...oooo...",
-		".gg.rr.gg.",
-		"g...rr...g",
-	},
-
-	{
-		"..........",
-		"..........",
-		"..........",
-		"..........",
-		".bbbbbbbb.",
-	},
     {
-        "..bbbbbbb.",
-        "...ggggg..",
-        "....rrr...",
-        ".....p....",
-        "..........",
-    },
-    {
-        "r.r.r.r.r.",
+        ".r.r.r.r.r",
+		"g.g.g.g.g.",
         ".v.v.v.v.v",
-        "g.g.g.g.g.",
         "b.b.b.b.b.",
         ".p.p.p.p.p",
+    },
+    {
+        "..........",
+        ".pppppppp.",
+        "...oooo...",
+        ".gg.rr.gg.",
+        "g...rr...g",
+    },
+
+    {
+        "..........",
+        "..........",
+        "..........",
+        "..........",
+        ".bbbbbbbb.",
+    },
+    {
+        ".bbbbbbbb.",
+        "..gggggg..",
+        "...rrrr...",
+        "....pp....",
+        "..........",
     },
 };
 
@@ -253,6 +253,7 @@ int main(void)
         BeginDrawing();
         ClearBackground(BLACK);
 
+        // Draw background
         DrawTextureEx(background, (Vector2){0.0f, 0.0f}, 0, 2.8f, WHITE);
 
         // Draw HUD
@@ -291,7 +292,7 @@ int main(void)
             g.mode = START;
             break;
         case FINISH:
-            render_at_center("GAME COMPLETED.", 64.0f, GOLD);
+            render_at_center("GAME COMPLETED", 64.0f, GOLD);
             break;
         default:
             break;
@@ -398,14 +399,14 @@ void init_level(int level_index)
             // NOTE: What is this '\0'? The null terminator for a string ok but why?
             else if (current_level[row][col] != '\0')
             {
-                int padding = 50;
-                int gap     = 5;
+                int padding = 100;
+                int gap     = 0;
 
                 brick new_brick;
                 new_brick.width      = BRICK_WIDTH;
                 new_brick.height     = BRICK_HEIGHT;
-                new_brick.position.x = col * (BRICK_WIDTH + gap) + padding;
-                new_brick.position.y = row * (BRICK_HEIGHT + gap) + padding;
+                new_brick.position.x = col * BRICK_WIDTH;
+                new_brick.position.y = row * BRICK_HEIGHT + padding;
                 new_brick.is_dead    = false;
                 new_brick.lives      = 1;
 
@@ -431,7 +432,7 @@ void init_level(int level_index)
                     break;
                 case 'b':
                     new_brick.color = BLUE;
-					new_brick.lives = 2;
+                    new_brick.lives = 2;
                     break;
                 case 'v':
                     new_brick.color = VIOLET;
