@@ -2,7 +2,7 @@
 
 Learn C by making breakout.
 
-## Contributionsc
+## Contributions
 
 Thank you NoCopyrightSound633 for the music!
 
@@ -23,16 +23,15 @@ How do we make the game fun or interesting in our own way?
 - [x] Increase ball speed by some percentage when a brick dies
 
 - [] Fix level initialization bugs and game state
-- [] Fix game dimensions and level design
+- [x] Fix game dimensions and level design
 - [] Fix game state transitions
 
 - [x] Add sound and music
-- [] Add muffled sound effect when paused
 
 - [x] Add a way to view lives
 - [x] Add a way to see score
 - [] Align them properly
-- [] Add background
+- [x] Add background
 
 - [] Do we make different game modes?
 - [] Do we reset the lives at each level?
@@ -40,6 +39,7 @@ How do we make the game fun or interesting in our own way?
 ## Bugs
 - [] Pressing Space makes the game start and flashes after game is completed
 - [] Speed may be increasing when the sides are hit
+- [] Side collission with paddle is choppy
 
 ## References
 
